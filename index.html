@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baixador de MP3 do YouTube</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+        }
+        .container {
+            max-width: 600px;
+            margin: 4rem auto;
+            padding: 2rem;
+            background-color: #ffffff;
+            border-radius: 1rem; /* Rounded corners */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); /* Soft shadow */
+        }
+        .btn-primary {
+            background-image: linear-gradient(to right, #ef4444 0%, #dc2626 100%); /* Red gradient */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem; /* More rounded */
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(239, 68, 68, 0.4);
+        }
+        .input-field {
+            border: 2px solid #e5e7eb;
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            transition: border-color 0.2s ease-in-out;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #ef4444; /* Red focus border */
+        }
+        .message-box {
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-top: 1.5rem;
+            font-weight: 500;
+            text-align: center;
+        }
+        .message-box.success {
+            background-color: #d1fae5; /* Green light */
+            color: #065f46; /* Green dark */
+        }
+        .message-box.error {
+            background-color: #fee2e2; /* Red light */
+            color: #991b1b; /* Red dark */
+        }
+        .message-box.info {
+            background-color: #e0f2fe; /* Blue light */
+            color: #0369a1; /* Blue dark */
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ffffff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @media (max-width: 768px) {
+            .container {
+                margin: 2rem 1rem;
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Baixador de MP3 do YouTube</h1>
+        <p class="text-center text-gray-600 mb-8">Cole a URL do vídeo do YouTube abaixo para baixar o áudio como MP3 diretamente para seu computador.</p>
+
+        <div class="mb-4">
+            <label for="youtubeUrl" class="block text-gray-700 text-sm font-bold mb-2">URL do Vídeo do YouTube:</label>
+            <input type="text" id="youtubeUrl" placeholder="Ex: https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                   class="input-field focus:ring-red-500 focus:border-red-500">
+        </div>
+
+        <button id="downloadButton"
+                class="btn-primary w-full flex items-center justify-center">
+            <span id="buttonText">Baixar MP3</span>
+            <span id="loadingSpinner" class="spinner hidden"></span>
+        </button>
+
+        <div id="messageArea" class="message-box hidden"></div>
+    </div>
+
+    <script>
+        const youtubeUrlInput = document.getElementById('youtubeUrl');
+        const downloadButton = document.getElementById('downloadButton');
+        const buttonText = document.getElementById('buttonText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const messageArea = document.getElementById('messageArea');
+
+        function showMessage(message, type) {
+            messageArea.textContent = message;
+            messageArea.className = `message-box ${type}`;
+            messageArea.classList.remove('hidden');
+        }
+
+        function hideMessage() {
+            messageArea.classList.add('hidden');
+        }
+
+        function setDownloadingState(isDownloading) {
+            downloadButton.disabled = isDownloading;
+            if (isDownloading) {
+                buttonText.textContent = 'Baixando...';
+                loadingSpinner.classList.remove('hidden');
+                downloadButton.classList.add('opacity-70', 'cursor-not-allowed');
+            } else {
+                buttonText.textContent = 'Baixar MP3';
+                loadingSpinner.classList.add('hidden');
+                downloadButton.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        }
+
+        downloadButton.addEventListener('click', async () => {
+            const url = youtubeUrlInput.value.trim();
+
+            if (!url) {
+                showMessage('Por favor, insira uma URL do YouTube.', 'error');
+                return;
+            }
+
+            if (!url.includes('youtube.com/watch?v=') && !url.includes('youtu.be/')) {
+                showMessage('URL inválida. Por favor, insira uma URL de vídeo do YouTube válida.', 'error');
+                return;
+            }
+
+            setDownloadingState(true);
+            showMessage('Iniciando download... Isso pode levar um momento.', 'info');
+
+            try {
+                const response = await fetch('/download_mp3', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url }),
+                });
+
+                if (response.ok) {
+                    // --- NOVA LÓGICA DE DOWNLOAD NO CLIENTE ---
+                    // Pega o nome do arquivo do cabeçalho Content-Disposition
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'audio.mp3'; // Nome padrão
+
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^;"']+)['"]?/i);
+                        if (filenameMatch && filenameMatch[1]) {
+                            // Decodifica o nome do arquivo se estiver URL-encoded (RFC 6266)
+                            filename = decodeURIComponent(filenameMatch[1].replace(/\+/g, ' '));
+                        }
+                    }
+
+                    // Obtém os dados binários do arquivo como um Blob
+                    const blob = await response.blob();
+                    
+                    // Cria um URL para o Blob
+                    const blobUrl = window.URL.createObjectURL(blob);
+
+                    // Cria um link temporário na página
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = filename; // Define o nome do arquivo para o download
+                    document.body.appendChild(a); // Adiciona o link ao DOM (necessário para Firefox)
+                    a.click(); // Simula um clique no link para iniciar o download
+                    document.body.removeChild(a); // Remove o link
+                    
+                    // Libera o Objeto URL para liberar memória
+                    window.URL.revokeObjectURL(blobUrl);
+
+                    showMessage('Download iniciado! Verifique sua pasta de downloads.', 'success');
+                    youtubeUrlInput.value = ''; // Limpa o campo após o sucesso
+                } else {
+                    // Se o backend enviar um status de erro (ex: 400, 500), ele enviará JSON.
+                    const errorData = await response.json();
+                    showMessage(errorData.error || 'Ocorreu um erro desconhecido no servidor.', 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao conectar ou processar download:', error);
+                showMessage('Não foi possível conectar ao servidor ou houve um erro no download.', 'error');
+            } finally {
+                setDownloadingState(false);
+            }
+        });
+    </script>
+</body>
+</html>
